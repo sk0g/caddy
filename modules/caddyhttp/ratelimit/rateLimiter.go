@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-var rateLimiter rateLimitOptions
+var rateLimiter *rateLimitOptions
 
 // rateLimitOptions stores options detailing how rate limiting should be applied,
 // as well as the current and previous window's hosts:requestCount mapping
@@ -25,17 +25,17 @@ type rateLimitOptions struct {
 
 // setupRateLimiter sets up the package-level variable `rateLimiter`,
 // and starts the auto-window refresh process
-func setupRateLimiter(windowLength time.Duration, maxRequests int64) (rl rateLimitOptions) {
-	rl = rateLimitOptions{
+func setupRateLimiter(windowLength time.Duration, maxRequests int64) (rl *rateLimitOptions) {
+	rl = &rateLimitOptions{
 		windowLength:   windowLength,
 		maxRequests:    maxRequests,
 		currentWindow:  newRequestCountTracker(windowLength),
-		previousWindow: nil,
+		previousWindow: &requestCountTracker{},
 	}
 
 	go func() { // automatic shuffling of request count tracking windows
 		for {
-			time.Sleep(time.Now().Sub(rl.currentWindow.endTime))
+			time.Sleep(rl.currentWindow.endTime.Sub(time.Now()))
 			rl.refreshWindows()
 		}
 	}()
@@ -47,8 +47,9 @@ func setupRateLimiter(windowLength time.Duration, maxRequests int64) (rl rateLim
 // moves currentWindow to previousWindow, and re-initialises currentWindow
 func (rl *rateLimitOptions) refreshWindows() (didRefresh bool) {
 	if rl.currentWindow.endTime.Before(time.Now()) {
+		rl.previousWindow = rl.currentWindow
+		rl.currentWindow = newRequestCountTracker(rl.windowLength)
 
-		rl.currentWindow, rl.previousWindow = newRequestCountTracker(rl.windowLength), rl.currentWindow
 		didRefresh = true
 	}
 
