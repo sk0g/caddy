@@ -6,7 +6,8 @@ import (
 
 var rateLimiter rateLimitOptions
 
-// rateLimitOptions stores options detailing how rate limiting should be applied
+// rateLimitOptions stores options detailing how rate limiting should be applied,
+// as well as the current and previous window's hosts:requestCount mapping
 type rateLimitOptions struct {
 	// window length for request rate checking (>= 5 minutes)
 	windowLength time.Duration
@@ -23,9 +24,13 @@ type rateLimitOptions struct {
 
 // setupRateLimiter sets up the package-level variable `rateLimiter`,
 // and starts the auto-window refresh process
-func (rl *rateLimitOptions) setupRateLimiter(windowLength time.Duration, maxRequests int64) {
-	rl.windowLength = windowLength
-	rl.maxRequests = maxRequests
+func setupRateLimiter(windowLength time.Duration, maxRequests int64) (rl rateLimitOptions) {
+	rl = rateLimitOptions{
+		windowLength:   windowLength,
+		maxRequests:    maxRequests,
+		currentWindow:  newRequestCountTracker(windowLength),
+		previousWindow: nil,
+	}
 
 	go func() { // automatic shuffling of request count tracking windows
 		for {
@@ -33,6 +38,8 @@ func (rl *rateLimitOptions) setupRateLimiter(windowLength time.Duration, maxRequ
 			rl.refreshWindows()
 		}
 	}()
+
+	return
 }
 
 // refreshWindows() checks if currentWindow has reached its expiry time, and if it has,

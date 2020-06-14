@@ -9,11 +9,11 @@ type requestCountTracker struct {
 }
 
 // newRequestCountTracker returns a pointer to a blank initialised requestCountTracker
-func newRequestCountTracker() *requestCountTracker {
+func newRequestCountTracker(windowLength time.Duration) *requestCountTracker {
 	return &requestCountTracker{
 		requestCount: map[string]int64{},
 		startTime:    time.Now(),
-		endTime:      time.Now().Add(rateLimiter.windowLength),
+		endTime:      time.Now().Add(windowLength),
 	}
 }
 
