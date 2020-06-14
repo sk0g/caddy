@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"math"
 	"time"
 )
 
@@ -47,9 +48,42 @@ func setupRateLimiter(windowLength time.Duration, maxRequests int64) (rl rateLim
 func (rl *rateLimitOptions) refreshWindows() (didRefresh bool) {
 	if rl.currentWindow.endTime.Before(time.Now()) {
 
-		rl.currentWindow, rl.previousWindow = newRequestCountTracker(), rl.currentWindow
+		rl.currentWindow, rl.previousWindow = newRequestCountTracker(rl.windowLength), rl.currentWindow
 		didRefresh = true
 	}
+
+	return
+}
+
+// requestShouldBlock checks whether the request from a given host name should block,
+// and increments the request counter for the hostName first
+// will block if current request would push the hostName over the blocking threshold
+func (rl *rateLimitOptions) requestShouldBlock(hostName string) (shouldBlock bool) {
+	rl.currentWindow.addRequestForHost(hostName)                     // increment request counter for host
+	return rl.getInterpolatedRequestCount(hostName) > rl.maxRequests // check if they now are above the request limit
+}
+
+// getInterpolatedRequestCount gets an interpolated request count for a specified hostName
+// Always considers requests across the given windowLength
+// More details: https://blog.cloudflare.com/counting-things-a-lot-of-different-things/
+//
+// For example say given a case where:
+// 	windowLength is 20 minutes
+// 	current window started 10 minutes ago
+// 	requestCount would be 0.5 * currentWindowRequests + 0.5 * previousWindowRequests
+func (rl rateLimitOptions) getInterpolatedRequestCount(hostName string) (requestCount int64) {
+	now := time.Now()
+
+	// calculate fraction of request that went in the current and previous windows
+	currentWindowFraction := now.Sub(rl.currentWindow.startTime).Seconds() / rl.windowLength.Seconds()
+	previousWindowFraction := 1 - currentWindowFraction // thankfully this one's a bit easier to calculate!
+
+	requestCount += int64(math.Round(
+		float64(rl.currentWindow.getRequestCountForHost(hostName)) *
+			currentWindowFraction))
+	requestCount += int64(math.Round(
+		float64(rl.previousWindow.getRequestCountForHost(hostName)) *
+			previousWindowFraction))
 
 	return
 }
