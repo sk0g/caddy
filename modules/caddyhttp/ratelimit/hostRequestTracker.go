@@ -8,10 +8,21 @@ type requestCountTracker struct {
 	endTime      time.Time
 }
 
+// newRequestCountTracker returns a pointer to a blank initialised requestCountTracker
 func newRequestCountTracker() *requestCountTracker {
 	return &requestCountTracker{
 		requestCount: map[string]int64{},
 		startTime:    time.Now(),
 		endTime:      time.Now().Add(rateLimiter.windowLength),
 	}
+}
+
+// addRequestForHost adds to the request counter for specified host name
+func (rct *requestCountTracker) addRequestForHost(hostName string) {
+	rct.requestCount[hostName] += 1
+}
+
+// getRequestCounterForHost gets the request count for a given host name
+func (rct requestCountTracker) getRequestCountForHost(hostName string) (requestCount int64) {
+	return rct.requestCount[hostName]
 }
