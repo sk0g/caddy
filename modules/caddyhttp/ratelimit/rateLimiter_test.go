@@ -7,8 +7,8 @@ import (
 
 func Test_rateLimitOptions_refreshWindows(t *testing.T) {
 	t.Run("Should refresh", func(t *testing.T) {
-		rateLimiter := rateLimitOptions{
-			windowLength: 15 * time.Minute,
+		rateLimiter := RateLimiter{
+			windowDuration: 15 * time.Minute,
 			currentWindow: &requestCountTracker{
 				requestCount: map[string]int64{},
 				startTime:    time.Now().Add(-35 * time.Minute),
@@ -22,8 +22,8 @@ func Test_rateLimitOptions_refreshWindows(t *testing.T) {
 	})
 
 	t.Run("Should not refresh", func(t *testing.T) {
-		rateLimiter := rateLimitOptions{
-			windowLength: 1 * time.Minute,
+		rateLimiter := RateLimiter{
+			windowDuration: 1 * time.Minute,
 			currentWindow: &requestCountTracker{
 				requestCount: map[string]int64{},
 				startTime:    time.Now().Add(-30 * time.Minute),
@@ -43,7 +43,8 @@ func Test_rateLimitOptions_blockingAndRequestCounting(t *testing.T) {
 	// getInterpolatedRequestCount()
 	hostName := "10.0.0.127"
 
-	rl := setupRateLimiter(20*time.Minute, 200)
+	rl := RateLimiter{}
+	rl.setupRateLimiter(20*time.Minute, 200)
 
 	rl.currentWindow.requestCount[hostName] = 100
 	rl.currentWindow.startTime = rl.currentWindow.startTime.Add(-10 * time.Minute)
@@ -79,36 +80,38 @@ func Test_rateLimitOptions_blockingAndRequestCounting(t *testing.T) {
 
 func Test_rateLimitOptions_setupRateLimiter(t *testing.T) {
 	t.Run("Should initialise properly", func(t *testing.T) {
-		rateLimiter := setupRateLimiter(1*time.Hour, 1e3)
+		rl := RateLimiter{}
+		rl.setupRateLimiter(1*time.Hour, 1e3)
 		hostName := "localhost"
 
-		if count := rateLimiter.currentWindow.getRequestCountForHost(hostName); count != 0 {
+		if count := rl.currentWindow.getRequestCountForHost(hostName); count != 0 {
 			t.Errorf("Unexpected request count - expected 0, got %v", count)
 		}
 
-		if count := rateLimiter.previousWindow.getRequestCountForHost(hostName); count != 0 {
+		if count := rl.previousWindow.getRequestCountForHost(hostName); count != 0 {
 			t.Errorf("Unexpected request count - expected 0, got %v", count)
 		}
 	})
 
 	// value of window kept very low for testing, minimum value should be 5 minutes
 	t.Run("Should shuffle windows after one second", func(t *testing.T) {
-		rateLimiter := setupRateLimiter(1*time.Second, 1e3)
+		rl := RateLimiter{}
+		rl.setupRateLimiter(1*time.Second, 1e3)
 		hostName := "localhost"
 
-		rateLimiter.requestShouldBlock(hostName)
+		rl.requestShouldBlock(hostName)
 
-		if count := rateLimiter.currentWindow.getRequestCountForHost(hostName); count != 1 {
+		if count := rl.currentWindow.getRequestCountForHost(hostName); count != 1 {
 			t.Errorf("Unexpected request count - expected 1, got %v", count)
 		}
 
 		time.Sleep(1100 * time.Millisecond)
 
-		if count := rateLimiter.currentWindow.getRequestCountForHost(hostName); count != 0 {
+		if count := rl.currentWindow.getRequestCountForHost(hostName); count != 0 {
 			t.Errorf("Unexpected request count - expected 0, got %v", count)
 		}
 
-		if count := rateLimiter.previousWindow.getRequestCountForHost(hostName); count != 1 {
+		if count := rl.previousWindow.getRequestCountForHost(hostName); count != 1 {
 			t.Errorf("Unexpected request count - expected 1, got %v", count)
 		}
 	})

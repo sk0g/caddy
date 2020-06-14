@@ -23,12 +23,16 @@ func init() {
 	httpcaddyfile.RegisterHandlerDirective("rate_limit", parseRateLimiter)
 }
 
-// parseRateLimiter parses the rate_limit directive. Syntax:
+// parseCaddyfileHandler unmarshals tokens from h into a new middleware handler value.
+//
+// syntax example:
 //     rate_limit {
 //         request_count: int,
 //         time_frame: string (eg. 1h, 15m, 2d)
 //     }
 // Note: time_frame must be higher than 5 minutes
 func parseRateLimiter(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	return nil, nil
+	var rl RateLimiter
+	err := rl.UnmarshalCaddyfile(h.Dispenser)
+	return &rl, err
 }
